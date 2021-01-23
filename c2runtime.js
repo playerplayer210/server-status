@@ -15582,13 +15582,13 @@ cr.plugins_.AJAX = function(runtime)
 }());
 ;
 ;
-cr.plugins_.Rex_CSV = function(runtime)
+cr.plugins_.Browser = function(runtime)
 {
 	this.runtime = runtime;
 };
 (function ()
 {
-	var pluginProto = cr.plugins_.Rex_CSV.prototype;
+	var pluginProto = cr.plugins_.Browser.prototype;
 	pluginProto.Type = function(plugin)
 	{
 		this.plugin = plugin;
@@ -15598,6 +15598,38 @@ cr.plugins_.Rex_CSV = function(runtime)
 	typeProto.onCreate = function()
 	{
 	};
+	var offlineScriptReady = false;
+	var browserPluginReady = false;
+	document.addEventListener("DOMContentLoaded", function ()
+	{
+		if (window["C2_RegisterSW"] && navigator["serviceWorker"])
+		{
+			var offlineClientScript = document.createElement("script");
+			offlineClientScript.onload = function ()
+			{
+				offlineScriptReady = true;
+				checkReady()
+			};
+			offlineClientScript.src = "offlineClient.js";
+			document.head.appendChild(offlineClientScript);
+		}
+	});
+	var browserInstance = null;
+	typeProto.onAppBegin = function ()
+	{
+		browserPluginReady = true;
+		checkReady();
+	};
+	function checkReady()
+	{
+		if (offlineScriptReady && browserPluginReady && window["OfflineClientInfo"])
+		{
+			window["OfflineClientInfo"]["SetMessageCallback"](function (e)
+			{
+				browserInstance.onSWMessage(e);
+			});
+		}
+	};
 	pluginProto.Instance = function(type)
 	{
 		this.type = type;
@@ -15606,889 +15638,749 @@ cr.plugins_.Rex_CSV = function(runtime)
 	var instanceProto = pluginProto.Instance.prototype;
 	instanceProto.onCreate = function()
 	{
-	    this.isInPreview = (typeof cr_is_preview !== "undefined");
-        this.strDelimiter = this.properties[0];
-        this.isEvalMode = (this.properties[1] == 1);
-        this.tables = {};
-        this.currentPageName = null;
-        this.currentTable = null;
-        this.forPage = "";
-        this.atCol = "";
-        this.atRow = "";
-        this.atPage = "";
-        this.TurnPage("_");
-        this.checkName = "CSV";
-	};
-	instanceProto.getValue = function(v)
-	{
-	    if (v == null)
-	        v = 0;
-	    else if (this.isEvalMode)
-	        v = eval("("+v+")");
-        return v;
-	};
-	instanceProto.HasPage = function(page)
-	{
-	    return (this.tables[page] != null);
-	};
-	instanceProto.TurnPage = function(page)
-	{
-        if (this.currentPageName === page)
-            return;
-        if (!this.HasPage(page))
-        {
-            this.tables[page] = new cr.plugins_.Rex_CSV.CSVKlass(this);
-        }
-        this.currentPageName = page;
-        this.currentTable = this.tables[page];
-	};
-	instanceProto.Get = function (col, row, page)
-	{
-        this.atCol = col;
-        this.atRow = row;
-        if (page != null)
-        {
-            this.TurnPage(page);
-        }
-        this.atPage = this.currentPageName;
-        return this.currentTable.At(col,row);
-	};
-	instanceProto.Set = function (value, col, row, page)
-	{
-        this.atCol = col;
-        this.atRow = row;
-        if (page != null)
-        {
-            this.TurnPage(page);
-        }
-        this.atPage = this.currentPageName;
-        this.currentTable.SetCell(col, row, value);
-	};
-	instanceProto.GetColCnt = function (page)
-	{
-        if (page != null)
-        {
-            this.TurnPage(page);
-        }
-        this.atPage = this.currentPageName;
-        return this.currentTable.GetColCnt();
-	};
-	instanceProto.GetRowCnt = function (page)
-	{
-        if (page != null)
-        {
-            this.TurnPage(page);
-        }
-        this.atPage = this.currentPageName;
-        return this.currentTable.GetRowCnt();
-	};
-	instanceProto.TableToString = function (page)
-	{
-        if (page != null)
-        {
-            this.TurnPage(page);
-        }
-        return this.currentTable.ToString();
-	};
-	instanceProto.saveToJSON = function ()
-	{
-	    var page, tables={};
-	    for (page in this.tables)
-        {
-            this.TurnPage(page);
-	        tables[page] = {"d":this.currentTable.table,
-			                "k":this.currentTable.keys,
-							"i":this.currentTable.items}
-		}
-		return { "d": tables,
-                      "delimiter": this.strDelimiter,
-                   };
-	};
-	instanceProto.loadFromJSON = function (o)
-	{
-	    var tables = o["d"], table;
-		var page;
-		for (page in tables)
+		var self = this;
+		window.addEventListener("resize", function () {
+			self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnResize, self);
+		});
+		browserInstance = this;
+		if (typeof navigator.onLine !== "undefined")
 		{
-		    this.TurnPage(page);
-		    table = tables[page];
-			this.currentTable.table = table["d"];
-			this.currentTable.keys = table["k"];
-			this.currentTable.items = table["i"];
+			window.addEventListener("online", function() {
+				self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnOnline, self);
+			});
+			window.addEventListener("offline", function() {
+				self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnOffline, self);
+			});
 		}
-        this.strDelimiter = o["delimiter"];
+		if (!this.runtime.isDirectCanvas)
+		{
+			document.addEventListener("appMobi.device.update.available", function() {
+				self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnUpdateReady, self);
+			});
+			document.addEventListener("backbutton", function() {
+				self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnBackButton, self);
+			});
+			document.addEventListener("menubutton", function() {
+				self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnMenuButton, self);
+			});
+			document.addEventListener("searchbutton", function() {
+				self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnSearchButton, self);
+			});
+			document.addEventListener("tizenhwkey", function (e) {
+				var ret;
+				switch (e["keyName"]) {
+				case "back":
+					ret = self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnBackButton, self);
+					if (!ret)
+					{
+						if (window["tizen"])
+							window["tizen"]["application"]["getCurrentApplication"]()["exit"]();
+					}
+					break;
+				case "menu":
+					ret = self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnMenuButton, self);
+					if (!ret)
+						e.preventDefault();
+					break;
+				}
+			});
+		}
+		if (this.runtime.isWindows10 && typeof Windows !== "undefined")
+		{
+			Windows["UI"]["Core"]["SystemNavigationManager"]["getForCurrentView"]().addEventListener("backrequested", function (e)
+			{
+				var ret = self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnBackButton, self);
+				if (ret)
+					e["handled"] = true;
+		    });
+		}
+		else if (this.runtime.isWinJS && WinJS["Application"])
+		{
+			WinJS["Application"]["onbackclick"] = function (e)
+			{
+				return !!self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnBackButton, self);
+			};
+		}
+		this.runtime.addSuspendCallback(function(s) {
+			if (s)
+			{
+				self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnPageHidden, self);
+			}
+			else
+			{
+				self.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnPageVisible, self);
+			}
+		});
+		this.is_arcade = (typeof window["is_scirra_arcade"] !== "undefined");
+	};
+	instanceProto.onSWMessage = function (e)
+	{
+		var messageType = e["data"]["type"];
+		if (messageType === "downloading-update")
+			this.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnUpdateFound, this);
+		else if (messageType === "update-ready" || messageType === "update-pending")
+			this.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnUpdateReady, this);
+		else if (messageType === "offline-ready")
+			this.runtime.trigger(cr.plugins_.Browser.prototype.cnds.OnOfflineReady, this);
+	};
+	var batteryManager = null;
+	var loadedBatteryManager = false;
+	function maybeLoadBatteryManager()
+	{
+		if (loadedBatteryManager)
+			return;
+		if (!navigator["getBattery"])
+			return;
+		var promise = navigator["getBattery"]();
+		loadedBatteryManager = true;
+		if (promise)
+		{
+			promise.then(function (manager) {
+				batteryManager = manager;
+			});
+		}
 	};
 	function Cnds() {};
+	Cnds.prototype.CookiesEnabled = function()
+	{
+		return navigator ? navigator.cookieEnabled : false;
+	};
+	Cnds.prototype.IsOnline = function()
+	{
+		return navigator ? navigator.onLine : false;
+	};
+	Cnds.prototype.HasJava = function()
+	{
+		return navigator ? navigator.javaEnabled() : false;
+	};
+	Cnds.prototype.OnOnline = function()
+	{
+		return true;
+	};
+	Cnds.prototype.OnOffline = function()
+	{
+		return true;
+	};
+	Cnds.prototype.IsDownloadingUpdate = function ()
+	{
+		return false;		// deprecated
+	};
+	Cnds.prototype.OnUpdateReady = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.PageVisible = function ()
+	{
+		return !this.runtime.isSuspended;
+	};
+	Cnds.prototype.OnPageVisible = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.OnPageHidden = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.OnResize = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.IsFullscreen = function ()
+	{
+		return !!(document["mozFullScreen"] || document["webkitIsFullScreen"] || document["fullScreen"] || this.runtime.isNodeFullscreen);
+	};
+	Cnds.prototype.OnBackButton = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.OnMenuButton = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.OnSearchButton = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.IsMetered = function ()
+	{
+		var connection = navigator["connection"] || navigator["mozConnection"] || navigator["webkitConnection"];
+		if (!connection)
+			return false;
+		return !!connection["metered"];
+	};
+	Cnds.prototype.IsCharging = function ()
+	{
+		var battery = navigator["battery"] || navigator["mozBattery"] || navigator["webkitBattery"];
+		if (battery)
+		{
+			return !!battery["charging"]
+		}
+		else
+		{
+			maybeLoadBatteryManager();
+			if (batteryManager)
+			{
+				return !!batteryManager["charging"];
+			}
+			else
+			{
+				return true;		// if unknown, default to charging (powered)
+			}
+		}
+	};
+	Cnds.prototype.IsPortraitLandscape = function (p)
+	{
+		var current = (window.innerWidth <= window.innerHeight ? 0 : 1);
+		return current === p;
+	};
+	Cnds.prototype.SupportsFullscreen = function ()
+	{
+		if (this.runtime.isNodeWebkit)
+			return true;
+		var elem = this.runtime.canvasdiv || this.runtime.canvas;
+		return !!(elem["requestFullscreen"] || elem["mozRequestFullScreen"] || elem["msRequestFullscreen"] || elem["webkitRequestFullScreen"]);
+	};
+	Cnds.prototype.OnUpdateFound = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.OnUpdateReady = function ()
+	{
+		return true;
+	};
+	Cnds.prototype.OnOfflineReady = function ()
+	{
+		return true;
+	};
 	pluginProto.cnds = new Cnds();
-	Cnds.prototype.ForEachCol = function ()
-	{
-        this.currentTable.ForEachCol();
-		return false;
-	};
-	Cnds.prototype.ForEachRowInCol = function (col)
-	{
-        this.currentTable.ForEachRowInCol(col);
-		return false;
-	};
-	Cnds.prototype.ForEachPage = function ()
-	{
-        var current_frame = this.runtime.getCurrentEventStack();
-        var current_event = current_frame.current_event;
-		var solModifierAfterCnds = current_frame.isModifierAfterCnds();
-		this.forPage = "";
-        var tables = this.tables;
-        var page;
-		for (page in tables)
-	    {
-		    if (solModifierAfterCnds)
-                this.runtime.pushCopySol(current_event.solModifiers);
-            this.forPage = page;
-            this.TurnPage(page);
-		    current_event.retrigger();
-            if (solModifierAfterCnds)
-		        this.runtime.popSol(current_event.solModifiers);
-		}
-		this.forPage = "";
-		return false;
-	};
-	Cnds.prototype.ForEachRow = function ()
-	{
-        this.currentTable.ForEachRow();
-		return false;
-	};
-	Cnds.prototype.ForEachColInRow = function (row)
-	{
-        this.currentTable.ForEachColInRow(row);
-		return false;
-	};
-	Cnds.prototype.IsDataInCol = function (data, col_name)
-	{
-		if (!(this.currentTable.keys.indexOf(col_name) != (-1)))
-		    return false;
-	    var table = this.currentTable.table;
-	    var col_data = table[col_name], row_name;
-		var matched = false;
-		for (row_name in col_data)
-		{
-		    if (col_data[row_name] == data)
-			{
-			    matched = true;
-				break;
-			}
-		}
-		return matched;
-	};
-	Cnds.prototype.IsDataInRow = function (data, row_name)
-	{
-		if (!(this.currentTable.items.indexOf(row_name) != (-1)))
-		    return false;
-	    var table = this.currentTable.table;
-	    var col_name;
-		var matched = false;
-		for (col_name in table)
-		{
-		    if (table[col_name][row_name] == data)
-			{
-			    matched = true;
-				break;
-			}
-		}
-		return matched;
-	};
-	Cnds.prototype.IsKeyInCol = function (key)
-	{
-        return (this.currentTable.keys.indexOf(key) != (-1));
-	};
-	Cnds.prototype.IsKeyInRow = function (key)
-	{
-        return (this.currentTable.items.indexOf(key) != (-1));
-	};
-	Cnds.prototype.IsCellValid = function (col, row)
-	{
-        return ((this.currentTable.keys.indexOf(col) != (-1)) &&
-                (this.currentTable.items.indexOf(row) != (-1))   );
-	};
-	Cnds.prototype.HasCol = function (col)
-	{
-        return (this.currentTable.keys.indexOf(col) != (-1));
-	};
-	Cnds.prototype.HasRow = function (row)
-	{
-        return (this.currentTable.items.indexOf(row) != (-1));
-	};
 	function Acts() {};
+	Acts.prototype.Alert = function (msg)
+	{
+		if (!this.runtime.isDomFree)
+			alert(msg.toString());
+	};
+	Acts.prototype.Close = function ()
+	{
+		if (this.runtime.isCocoonJs)
+			CocoonJS["App"]["forceToFinish"]();
+		else if (window["tizen"])
+			window["tizen"]["application"]["getCurrentApplication"]()["exit"]();
+		else if (navigator["app"] && navigator["app"]["exitApp"])
+			navigator["app"]["exitApp"]();
+		else if (navigator["device"] && navigator["device"]["exitApp"])
+			navigator["device"]["exitApp"]();
+		else if (!this.is_arcade && !this.runtime.isDomFree)
+			window.close();
+	};
+	Acts.prototype.Focus = function ()
+	{
+		if (this.runtime.isNodeWebkit)
+		{
+			var win = window["nwgui"]["Window"]["get"]();
+			win["focus"]();
+		}
+		else if (!this.is_arcade && !this.runtime.isDomFree)
+			window.focus();
+	};
+	Acts.prototype.Blur = function ()
+	{
+		if (this.runtime.isNodeWebkit)
+		{
+			var win = window["nwgui"]["Window"]["get"]();
+			win["blur"]();
+		}
+		else if (!this.is_arcade && !this.runtime.isDomFree)
+			window.blur();
+	};
+	Acts.prototype.GoBack = function ()
+	{
+		if (navigator["app"] && navigator["app"]["backHistory"])
+			navigator["app"]["backHistory"]();
+		else if (!this.is_arcade && !this.runtime.isDomFree && window.back)
+			window.back();
+	};
+	Acts.prototype.GoForward = function ()
+	{
+		if (!this.is_arcade && !this.runtime.isDomFree && window.forward)
+			window.forward();
+	};
+	Acts.prototype.GoHome = function ()
+	{
+		if (!this.is_arcade && !this.runtime.isDomFree && window.home)
+			window.home();
+	};
+	Acts.prototype.GoToURL = function (url, target)
+	{
+		if (this.runtime.isCocoonJs)
+			CocoonJS["App"]["openURL"](url);
+		else if (this.runtime.isEjecta)
+			ejecta["openURL"](url);
+		else if (this.runtime.isWinJS)
+			Windows["System"]["Launcher"]["launchUriAsync"](new Windows["Foundation"]["Uri"](url));
+		else if (navigator["app"] && navigator["app"]["loadUrl"])
+			navigator["app"]["loadUrl"](url, { "openExternal": true });
+		else if (this.runtime.isCordova)
+			window.open(url, "_system");
+		else if (!this.is_arcade && !this.runtime.isDomFree)
+		{
+			if (target === 2 && !this.is_arcade)		// top
+				window.top.location = url;
+			else if (target === 1 && !this.is_arcade)	// parent
+				window.parent.location = url;
+			else					// self
+				window.location = url;
+		}
+	};
+	Acts.prototype.GoToURLWindow = function (url, tag)
+	{
+		if (this.runtime.isCocoonJs)
+			CocoonJS["App"]["openURL"](url);
+		else if (this.runtime.isEjecta)
+			ejecta["openURL"](url);
+		else if (this.runtime.isWinJS)
+			Windows["System"]["Launcher"]["launchUriAsync"](new Windows["Foundation"]["Uri"](url));
+		else if (navigator["app"] && navigator["app"]["loadUrl"])
+			navigator["app"]["loadUrl"](url, { "openExternal": true });
+		else if (this.runtime.isCordova)
+			window.open(url, "_system");
+		else if (!this.is_arcade && !this.runtime.isDomFree)
+			window.open(url, tag);
+	};
+	Acts.prototype.Reload = function ()
+	{
+		if (!this.is_arcade && !this.runtime.isDomFree)
+			window.location.reload();
+	};
+	var firstRequestFullscreen = true;
+	var crruntime = null;
+	function onFullscreenError(e)
+	{
+		if (console && console.warn)
+			console.warn("Fullscreen request failed: ", e);
+		crruntime["setSize"](window.innerWidth, window.innerHeight);
+	};
+	Acts.prototype.RequestFullScreen = function (stretchmode)
+	{
+		if (this.runtime.isDomFree)
+		{
+			cr.logexport("[Construct 2] Requesting fullscreen is not supported on this platform - the request has been ignored");
+			return;
+		}
+		if (stretchmode >= 2)
+			stretchmode += 1;
+		if (stretchmode === 6)
+			stretchmode = 2;
+		if (this.runtime.isNodeWebkit)
+		{
+			if (this.runtime.isDebug)
+			{
+				debuggerFullscreen(true);
+			}
+			else if (!this.runtime.isNodeFullscreen && window["nwgui"])
+			{
+				window["nwgui"]["Window"]["get"]()["enterFullscreen"]();
+				this.runtime.isNodeFullscreen = true;
+				this.runtime.fullscreen_scaling = (stretchmode >= 2 ? stretchmode : 0);
+			}
+		}
+		else
+		{
+			if (document["mozFullScreen"] || document["webkitIsFullScreen"] || !!document["msFullscreenElement"] || document["fullScreen"] || document["fullScreenElement"])
+			{
+				return;
+			}
+			this.runtime.fullscreen_scaling = (stretchmode >= 2 ? stretchmode : 0);
+			var elem = document.documentElement;
+			if (firstRequestFullscreen)
+			{
+				firstRequestFullscreen = false;
+				crruntime = this.runtime;
+				elem.addEventListener("mozfullscreenerror", onFullscreenError);
+				elem.addEventListener("webkitfullscreenerror", onFullscreenError);
+				elem.addEventListener("MSFullscreenError", onFullscreenError);
+				elem.addEventListener("fullscreenerror", onFullscreenError);
+			}
+			if (elem["requestFullscreen"])
+				elem["requestFullscreen"]();
+			else if (elem["mozRequestFullScreen"])
+				elem["mozRequestFullScreen"]();
+			else if (elem["msRequestFullscreen"])
+				elem["msRequestFullscreen"]();
+			else if (elem["webkitRequestFullScreen"])
+			{
+				if (typeof Element !== "undefined" && typeof Element["ALLOW_KEYBOARD_INPUT"] !== "undefined")
+					elem["webkitRequestFullScreen"](Element["ALLOW_KEYBOARD_INPUT"]);
+				else
+					elem["webkitRequestFullScreen"]();
+			}
+		}
+	};
+	Acts.prototype.CancelFullScreen = function ()
+	{
+		if (this.runtime.isDomFree)
+		{
+			cr.logexport("[Construct 2] Exiting fullscreen is not supported on this platform - the request has been ignored");
+			return;
+		}
+		if (this.runtime.isNodeWebkit)
+		{
+			if (this.runtime.isDebug)
+			{
+				debuggerFullscreen(false);
+			}
+			else if (this.runtime.isNodeFullscreen && window["nwgui"])
+			{
+				window["nwgui"]["Window"]["get"]()["leaveFullscreen"]();
+				this.runtime.isNodeFullscreen = false;
+			}
+		}
+		else
+		{
+			if (document["exitFullscreen"])
+				document["exitFullscreen"]();
+			else if (document["mozCancelFullScreen"])
+				document["mozCancelFullScreen"]();
+			else if (document["msExitFullscreen"])
+				document["msExitFullscreen"]();
+			else if (document["webkitCancelFullScreen"])
+				document["webkitCancelFullScreen"]();
+		}
+	};
+	Acts.prototype.Vibrate = function (pattern_)
+	{
+		try {
+			var arr = pattern_.split(",");
+			var i, len;
+			for (i = 0, len = arr.length; i < len; i++)
+			{
+				arr[i] = parseInt(arr[i], 10);
+			}
+			if (navigator["vibrate"])
+				navigator["vibrate"](arr);
+			else if (navigator["mozVibrate"])
+				navigator["mozVibrate"](arr);
+			else if (navigator["webkitVibrate"])
+				navigator["webkitVibrate"](arr);
+			else if (navigator["msVibrate"])
+				navigator["msVibrate"](arr);
+		}
+		catch (e) {}
+	};
+	Acts.prototype.InvokeDownload = function (url_, filename_)
+	{
+		var a = document.createElement("a");
+		if (typeof a["download"] === "undefined")
+		{
+			window.open(url_);
+		}
+		else
+		{
+			var body = document.getElementsByTagName("body")[0];
+			a.textContent = filename_;
+			a.href = url_;
+			a["download"] = filename_;
+			body.appendChild(a);
+			var clickEvent = new MouseEvent("click");
+			a.dispatchEvent(clickEvent);
+			body.removeChild(a);
+		}
+	};
+	Acts.prototype.InvokeDownloadString = function (str_, mimetype_, filename_)
+	{
+		var datauri = "data:" + mimetype_ + "," + encodeURIComponent(str_);
+		var a = document.createElement("a");
+		if (typeof a["download"] === "undefined")
+		{
+			window.open(datauri);
+		}
+		else
+		{
+			var body = document.getElementsByTagName("body")[0];
+			a.textContent = filename_;
+			a.href = datauri;
+			a["download"] = filename_;
+			body.appendChild(a);
+			var clickEvent = new MouseEvent("click");
+			a.dispatchEvent(clickEvent);
+			body.removeChild(a);
+		}
+	};
+	Acts.prototype.ConsoleLog = function (type_, msg_)
+	{
+		if (typeof console === "undefined")
+			return;
+		if (type_ === 0 && console.log)
+			console.log(msg_.toString());
+		if (type_ === 1 && console.warn)
+			console.warn(msg_.toString());
+		if (type_ === 2 && console.error)
+			console.error(msg_.toString());
+	};
+	Acts.prototype.ConsoleGroup = function (name_)
+	{
+		if (console && console.group)
+			console.group(name_);
+	};
+	Acts.prototype.ConsoleGroupEnd = function ()
+	{
+		if (console && console.groupEnd)
+			console.groupEnd();
+	};
+	Acts.prototype.ExecJs = function (js_)
+	{
+		try {
+			if (eval)
+				eval(js_);
+		}
+		catch (e)
+		{
+			if (console && console.error)
+				console.error("Error executing Javascript: ", e);
+		}
+	};
+	var orientations = [
+		"portrait",
+		"landscape",
+		"portrait-primary",
+		"portrait-secondary",
+		"landscape-primary",
+		"landscape-secondary"
+	];
+	Acts.prototype.LockOrientation = function (o)
+	{
+		o = Math.floor(o);
+		if (o < 0 || o >= orientations.length)
+			return;
+		this.runtime.autoLockOrientation = false;
+		var orientation = orientations[o];
+		if (screen["orientation"] && screen["orientation"]["lock"])
+			screen["orientation"]["lock"](orientation);
+		else if (screen["lockOrientation"])
+			screen["lockOrientation"](orientation);
+		else if (screen["webkitLockOrientation"])
+			screen["webkitLockOrientation"](orientation);
+		else if (screen["mozLockOrientation"])
+			screen["mozLockOrientation"](orientation);
+		else if (screen["msLockOrientation"])
+			screen["msLockOrientation"](orientation);
+	};
+	Acts.prototype.UnlockOrientation = function ()
+	{
+		this.runtime.autoLockOrientation = false;
+		if (screen["orientation"] && screen["orientation"]["unlock"])
+			screen["orientation"]["unlock"]();
+		else if (screen["unlockOrientation"])
+			screen["unlockOrientation"]();
+		else if (screen["webkitUnlockOrientation"])
+			screen["webkitUnlockOrientation"]();
+		else if (screen["mozUnlockOrientation"])
+			screen["mozUnlockOrientation"]();
+		else if (screen["msUnlockOrientation"])
+			screen["msUnlockOrientation"]();
+	};
 	pluginProto.acts = new Acts();
-	Acts.prototype.LoadCSV = function (csv_string)
-	{
-        this.currentTable._parsing(csv_string);
-	};
-	Acts.prototype.SetCell = function (col, row, val)
-	{
-        this.currentTable.SetCell(col, row, val);
-	};
-	Acts.prototype.Clear = function ()
-	{
-		 this.currentTable.Clear();
-	};
-	Acts.prototype.ConvertRow = function (row, to_type)
-	{
-         this.currentTable.ConvertRow(row, to_type);
-	};
-	Acts.prototype.TurnPage = function (page)
-	{
-         this.TurnPage(page);
-	};
-	Acts.prototype.StringToPage = function (JSON_string)
-	{
-        this.currentTable.JSONString2Page(JSON_string);
-	};
-	Acts.prototype.StringToPage = function (JSON_string)
-	{
-        this.currentTable.JSONString2Page(JSON_string);
-	};
-	Acts.prototype.AppendCol = function (col, init_value)
-	{
-        this.currentTable.AppendCol(col, init_value);
-	};
-	Acts.prototype.AppendRow = function (row, init_value)
-	{
-        this.currentTable.AppendRow(row, init_value);
-	};
-	Acts.prototype.RemoveCol = function (col)
-	{
-        if (typeof (col) === "number")
-        {
-            var cols = this.currentTable.keys;
-            col = cols[col];
-        }
-        this.currentTable.RemoveCol(col);
-	};
-	Acts.prototype.RemoveRow = function (row)
-	{
-        if (typeof (row) === "number")
-        {
-            var rows = this.currentTable.items;
-            row = rows[row];
-        }
-        this.currentTable.RemoveRow(row);
-	};
-	Acts.prototype.SetDelimiter = function (s)
-	{
-        this.strDelimiter = s;
-	};
-	Acts.prototype.StringToAllTables = function (JSON_string)
-	{
-	    var page;
-	    var tables=JSON.parse(JSON_string);
-	    for (page in tables)
-	    {
-	        this.TurnPage(page);
-	        this.currentTable.JSONString2Page(tables[page]);
-	    }
-	};
-	Acts.prototype.SortCol = function (col, is_increasing)
-	{
-        this.currentTable.SortCol(col, is_increasing);
-	};
-	Acts.prototype.SortRow = function (row, is_increasing)
-	{
-        this.currentTable.SortRow(row, is_increasing);
-	};
-	Acts.prototype.SetCellAtPage = function (col, row, page, val)
-	{
-        this.TurnPage(page);
-        this.currentTable.SetCell(col, row, val);
-	};
-	Acts.prototype.AddToCell = function (col, row, val)
-	{
-        var value = this.Get(col, row) || 0;
-        this.currentTable.SetCell(col, row, value + val);
-	};
-	Acts.prototype.AddToCellAtPage = function (col, row, page, val)
-	{
-        var value = this.Get(col, row, page) || 0;
-        this.TurnPage(page);
-        this.currentTable.SetCell(col, row, value + val);
-	};
-	Acts.prototype.ConvertCol = function (col, to_type)
-	{
-         this.currentTable.ConvertCol(col, to_type);
-	};
 	function Exps() {};
+	Exps.prototype.URL = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : window.location.toString());
+	};
+	Exps.prototype.Protocol = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : window.location.protocol);
+	};
+	Exps.prototype.Domain = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : window.location.hostname);
+	};
+	Exps.prototype.PathName = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : window.location.pathname);
+	};
+	Exps.prototype.Hash = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : window.location.hash);
+	};
+	Exps.prototype.Referrer = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : document.referrer);
+	};
+	Exps.prototype.Title = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : document.title);
+	};
+	Exps.prototype.Name = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : navigator.appName);
+	};
+	Exps.prototype.Version = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : navigator.appVersion);
+	};
+	Exps.prototype.Language = function (ret)
+	{
+		if (navigator && navigator.language)
+			ret.set_string(navigator.language);
+		else
+			ret.set_string("");
+	};
+	Exps.prototype.Platform = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : navigator.platform);
+	};
+	Exps.prototype.Product = function (ret)
+	{
+		if (navigator && navigator.product)
+			ret.set_string(navigator.product);
+		else
+			ret.set_string("");
+	};
+	Exps.prototype.Vendor = function (ret)
+	{
+		if (navigator && navigator.vendor)
+			ret.set_string(navigator.vendor);
+		else
+			ret.set_string("");
+	};
+	Exps.prototype.UserAgent = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : navigator.userAgent);
+	};
+	Exps.prototype.QueryString = function (ret)
+	{
+		ret.set_string(this.runtime.isDomFree ? "" : window.location.search);
+	};
+	Exps.prototype.QueryParam = function (ret, paramname)
+	{
+		if (this.runtime.isDomFree)
+		{
+			ret.set_string("");
+			return;
+		}
+		var match = RegExp('[?&]' + paramname + '=([^&]*)').exec(window.location.search);
+		if (match)
+			ret.set_string(decodeURIComponent(match[1].replace(/\+/g, ' ')));
+		else
+			ret.set_string("");
+	};
+	Exps.prototype.Bandwidth = function (ret)
+	{
+		var connection = navigator["connection"] || navigator["mozConnection"] || navigator["webkitConnection"];
+		if (!connection)
+			ret.set_float(Number.POSITIVE_INFINITY);
+		else
+		{
+			if (typeof connection["bandwidth"] !== "undefined")
+				ret.set_float(connection["bandwidth"]);
+			else if (typeof connection["downlinkMax"] !== "undefined")
+				ret.set_float(connection["downlinkMax"]);
+			else
+				ret.set_float(Number.POSITIVE_INFINITY);
+		}
+	};
+	Exps.prototype.ConnectionType = function (ret)
+	{
+		var connection = navigator["connection"] || navigator["mozConnection"] || navigator["webkitConnection"];
+		if (!connection)
+			ret.set_string("unknown");
+		else
+		{
+			ret.set_string(connection["type"] || "unknown");
+		}
+	};
+	Exps.prototype.BatteryLevel = function (ret)
+	{
+		var battery = navigator["battery"] || navigator["mozBattery"] || navigator["webkitBattery"];
+		if (battery)
+		{
+			ret.set_float(battery["level"]);
+		}
+		else
+		{
+			maybeLoadBatteryManager();
+			if (batteryManager)
+			{
+				ret.set_float(batteryManager["level"]);
+			}
+			else
+			{
+				ret.set_float(1);		// not supported/unknown: assume charged
+			}
+		}
+	};
+	Exps.prototype.BatteryTimeLeft = function (ret)
+	{
+		var battery = navigator["battery"] || navigator["mozBattery"] || navigator["webkitBattery"];
+		if (battery)
+		{
+			ret.set_float(battery["dischargingTime"]);
+		}
+		else
+		{
+			maybeLoadBatteryManager();
+			if (batteryManager)
+			{
+				ret.set_float(batteryManager["dischargingTime"]);
+			}
+			else
+			{
+				ret.set_float(Number.POSITIVE_INFINITY);		// not supported/unknown: assume infinite time left
+			}
+		}
+	};
+	Exps.prototype.ExecJS = function (ret, js_)
+	{
+		if (!eval)
+		{
+			ret.set_any(0);
+			return;
+		}
+		var result = 0;
+		try {
+			result = eval(js_);
+		}
+		catch (e)
+		{
+			if (console && console.error)
+				console.error("Error executing Javascript: ", e);
+		}
+		if (typeof result === "number")
+			ret.set_any(result);
+		else if (typeof result === "string")
+			ret.set_any(result);
+		else if (typeof result === "boolean")
+			ret.set_any(result ? 1 : 0);
+		else
+			ret.set_any(0);
+	};
+	Exps.prototype.ScreenWidth = function (ret)
+	{
+		ret.set_int(screen.width);
+	};
+	Exps.prototype.ScreenHeight = function (ret)
+	{
+		ret.set_int(screen.height);
+	};
+	Exps.prototype.DevicePixelRatio = function (ret)
+	{
+		ret.set_float(this.runtime.devicePixelRatio);
+	};
+	Exps.prototype.WindowInnerWidth = function (ret)
+	{
+		ret.set_int(window.innerWidth);
+	};
+	Exps.prototype.WindowInnerHeight = function (ret)
+	{
+		ret.set_int(window.innerHeight);
+	};
+	Exps.prototype.WindowOuterWidth = function (ret)
+	{
+		ret.set_int(window.outerWidth);
+	};
+	Exps.prototype.WindowOuterHeight = function (ret)
+	{
+		ret.set_int(window.outerHeight);
+	};
 	pluginProto.exps = new Exps();
-	Exps.prototype.At = function (ret, col, row, page, default_value)
-	{
-        if (page != null)
-            this.TurnPage(page);
-        if (typeof (col) === "number")
-        {
-            var cols = this.currentTable.keys;
-            col = cols[col];
-        }
-        if (typeof (row) === "number")
-        {
-            var rows = this.currentTable.items;
-            row = rows[row];
-        }
-        var value = this.Get(col, row, page);
-        if (value == null)
-            value = (default_value == null)? 0 : default_value;
-        ret.set_any(value);
-	};
-	Exps.prototype.CurCol = function (ret)
-	{
-		ret.set_string(this.currentTable.forCol);
-	};
-	Exps.prototype.CurRow = function (ret)
-	{
-		ret.set_string(this.currentTable.forRow);
-	};
-	Exps.prototype.CurValue = function (ret)
-	{
-		ret.set_any(this.currentTable.At( this.currentTable.forCol, this.currentTable.forRow ));
-	};
-	Exps.prototype.AtCol = function (ret)
-	{
-		ret.set_string(this.atCol);
-	};
-	Exps.prototype.AtRow = function (ret)
-	{
-		ret.set_string(this.atRow);
-	};
-	Exps.prototype.AtPage = function (ret)
-	{
-		ret.set_string(this.atPage);
-	};
-	Exps.prototype.CurPage = function (ret)
-	{
-		ret.set_string(this.forPage);
-	};
-	Exps.prototype.TableToString = function (ret, page)
-	{
-		ret.set_string(this.TableToString(page));
-	};
-	Exps.prototype.ColCnt = function (ret, page)
-	{
-		ret.set_int(this.GetColCnt(page));
-	};
-	Exps.prototype.RowCnt = function (ret, page)
-	{
-		ret.set_int(this.GetRowCnt(page));
-	};
-	Exps.prototype.Delimiter = function (ret)
-	{
-		ret.set_string(this.strDelimiter);
-	};
-	Exps.prototype.AllTalbesToString = function (ret)
-	{
-	    var page, table2string={};
-	    for (page in this.tables)
-	        table2string[page] = this.TableToString(page);
-		ret.set_string(JSON.stringify(table2string));
-	};
-	Exps.prototype.TableToCSV = function (ret)
-	{
-		ret.set_string(this.currentTable.ToCSVString());
-	};
-	Exps.prototype.NextCol = function (ret, col)
-	{
-        if (col == null)
-            col = this.atCol;
-        var cols = this.currentTable.keys;
-        var idx = cols.indexOf(col);
-        var next_col;
-        if (idx !== -1)
-            next_col = cols[idx+1];
-		ret.set_string(next_col || "");
-	};
-	Exps.prototype.PreviousCol = function (ret, col)
-	{
-        if (col == null)
-            col = this.atCol;
-        var cols = this.currentTable.keys;
-        var idx = cols.indexOf(col);
-        var next_col;
-        if (idx !== -1)
-            next_col = cols[idx-1];
-		ret.set_string(next_col || "");
-	};
-	Exps.prototype.NextRow = function (ret, row)
-	{
-        if (row == null)
-            row = this.atRow;
-        var rows = this.currentTable.items;
-        var idx = rows.indexOf(row);
-        var next_row;
-        if (idx !== -1)
-            next_row = rows[idx+1];
-		ret.set_string(next_row || "");
-	};
-	Exps.prototype.PreviousRow = function (ret, row)
-	{
-        if (row == null)
-            row = this.atRow;
-        var rows = this.currentTable.items;
-        var idx = rows.indexOf(row);
-        var next_row;
-        if (idx !== -1)
-            next_row = rows[idx-1];
-		ret.set_string(next_row || "");
-	};
-}());
-(function ()
-{
-    cr.plugins_.Rex_CSV.CSVKlass = function(plugin)
-    {
-        this.plugin = plugin;
-		this.table = {};
-        this.keys = [];    // col name
-        this.items = [];   // row name
-        this.forCol = "";
-        this.forRow = "";
-    };
-    var CSVKlassProto = cr.plugins_.Rex_CSV.CSVKlass.prototype;
-	CSVKlassProto.Clear = function()
-	{
-        var key;
-        for (key in this.table)
-            delete this.table[key];
-        this.keys.length = 0;
-        this.items.length = 0;
-	};
-	CSVKlassProto.ToString = function()
-	{
-        var save_data = {"table":this.table,
-                         "keys":this.keys,
-                         "items":this.items};
-		return JSON.stringify(save_data);
-	};
-	CSVKlassProto.JSONString2Page = function(JSON_string)
-	{
-        var save_data = JSON.parse(JSON_string);
-        try
-        {
-	        this.table = save_data["table"];
-            this.keys = save_data["keys"];
-            this.items = save_data["items"];
-        }
-        catch(err)  // compatible with older version
-        {
-            this.table = save_data;
-        }
-	};
-    CSVKlassProto._create_keys = function()
-	{
-        var keys = this.keys;
-        var key_cnt = this.keys.length;
-        var i, key;
-        for (i=0; i<key_cnt; i++)
-        {
-            key = keys[i];
-            if (this.table[key] == null)
-                this.table[key] = {};
-        }
-	};
-    CSVKlassProto._create_items = function(values)
-	{
-        var item_name = values.shift();
-        var keys = this.keys;
-        var key_cnt = this.keys.length;
-        var table = this.table;
-        var i, v;
-        for (i=0; i<key_cnt; i++)
-        {
-            v = this.plugin.getValue(values[i]);
-            table[keys[i]][item_name] = v;
-        }
-        this.items.push(item_name);
-	};
-	CSVKlassProto._parsing = function(csv_string)
-	{
-        if (csv_string == "")
-            return;
-        var read_array = CSVToArray(csv_string, this.plugin.strDelimiter);
-        this.keys = read_array.shift();
-        this._create_keys();
-        var item_cnt = read_array.length;
-        var i;
-        for (i=0; i<item_cnt; i++)
-        {
-            this._create_items(read_array[i]);
-        }
-	};
-    CSVKlassProto.At = function(col, row)
-	{
-	    var cell;
-	    cell = this.table[col];
-	    if (cell == null)
-        {
-;
-	        return null;
-        }
-	    cell = cell[row];
-	    if (cell == null)
-        {
-;
-	        return null;
-        }
-        return cell;
-	};
-	CSVKlassProto.SetCell = function (col, row, val)
-	{
-	    var cell;
-	    cell = this.table[col];
-	    if (cell == null)
-        {
-;
-	        return;
-        }
-	    cell = cell[row];
-	    if (cell == null)
-        {
-;
-	        return;
-        }
-        this.table[col][row] = val;
-	};
-	CSVKlassProto.ConvertCol = function (col, to_type)
-	{
-        var handler = (to_type==0)? parseInt:
-                                    parseFloat;
-        var items = this.items;
-        var item_cnt = items.length;
-        var table = this.table;
-        var i, val;
-        for (i=0; i<item_cnt; i++)
-        {
-            val = table[col][items[i]];
-            table[col][items[i]] = handler(val);
-        }
-	};
-	CSVKlassProto.ConvertRow = function (row, to_type)
-	{
-        var handler = (to_type==0)? parseInt:
-                                    parseFloat;
-        var keys = this.keys;
-        var key_cnt = keys.length;
-        var table = this.table;
-        var i, val;
-        for (i=0; i<key_cnt; i++)
-        {
-            val = table[keys[i]][row];
-            table[keys[i]][row] = handler(val);
-        }
-	};
-	CSVKlassProto.AppendCol = function (col, init_value)
-	{
-        if (this.keys.indexOf(col) != (-1))
-            return;
-        var has_ref = false;
-        if (this.keys.length > 0)
-        {
-            var ref_col = this.table[this.keys[0]];
-            has_ref = true;
-        }
-        var col_data = {};
-        var items = this.items;
-        var item_cnt = items.length;
-        var i;
-        for (i=0; i<item_cnt; i++)
-        {
-            if (has_ref)
-            {
-                if (typeof ref_col[items[i]] == "number")
-                    col_data[items[i]] = 0;
-                else
-                     col_data[items[i]] = "";
-            }
-            else
-                col_data[items[i]] = init_value;
-        }
-        this.table[col] = col_data;
-        this.keys.push(col);
-	};
-	CSVKlassProto.AppendRow = function (row, init_value)
-	{
-        if (this.items.indexOf(row) != (-1))
-            return;
-        var keys = this.keys;
-        var key_cnt = keys.length;
-        var table = this.table;
-        var i;
-        for (i=0; i<key_cnt; i++)
-        {
-            table[keys[i]][row] = init_value;
-        }
-        this.items.push(row);
-	};
-	CSVKlassProto.RemoveCol = function (col)
-	{
-        var col_index = this.keys.indexOf(col);
-        if (col_index == (-1))
-            return;
-        delete this.table[col];
-        this.keys.splice(col_index, 1);
-	};
-	CSVKlassProto.RemoveRow = function (row)
-	{
-        var row_index = this.items.indexOf(row);
-        if (row_index == (-1))
-            return;
-        var keys = this.keys;
-        var key_cnt = keys.length;
-        var table = this.table;
-        var i;
-        for (i=0; i<key_cnt; i++)
-        {
-            delete table[keys[i]][row];
-        }
-        this.items.splice(row_index, 1);
-	};
-	CSVKlassProto.ForEachCol = function ()
-	{
-        var current_frame = this.plugin.runtime.getCurrentEventStack();
-        var current_event = current_frame.current_event;
-		var solModifierAfterCnds = current_frame.isModifierAfterCnds();
-		this.forCol = "";
-        var keys = this.keys;
-        var key_cnt = keys.length;
-        var i;
-		for (i=0; i<key_cnt; i++ )
-	    {
-            if (solModifierAfterCnds)
-		        this.plugin.runtime.pushCopySol(current_event.solModifiers);
-            this.forCol = keys[i];
-		    current_event.retrigger();
-            if (solModifierAfterCnds)
-		    	this.plugin.runtime.popSol(current_event.solModifiers);
-		}
-		this.forCol = "";
-	};
-	CSVKlassProto.ForEachRowInCol = function (col)
-	{
-        var has_col_index = (this.keys.indexOf(col)!=(-1));
-        if (!has_col_index)
-        {
-;
-            return;
-        }
-        this.forCol = col;
-        var current_frame = this.plugin.runtime.getCurrentEventStack();
-        var current_event = current_frame.current_event;
-		var solModifierAfterCnds = current_frame.isModifierAfterCnds();
-		this.forRow = "";
-        var items = this.items;
-        var item_cnt = items.length;
-        var i;
-		for (i=0; i<item_cnt; i++ )
-	    {
-            if (solModifierAfterCnds)
-		        this.plugin.runtime.pushCopySol(current_event.solModifiers);
-            this.forRow = items[i];
-		    current_event.retrigger();
-            if (solModifierAfterCnds)
-		    	this.plugin.runtime.popSol(current_event.solModifiers);
-		}
-		this.forRow = "";
-	};
-	CSVKlassProto.ForEachRow = function ()
-	{
-        var current_frame = this.plugin.runtime.getCurrentEventStack();
-        var current_event = current_frame.current_event;
-		var solModifierAfterCnds = current_frame.isModifierAfterCnds();
-		this.forRow = "";
-        var items = this.items;
-        var item_cnt = items.length;
-        var i;
-		for (i=0; i<item_cnt; i++ )
-	    {
-            if (solModifierAfterCnds)
-		        this.plugin.runtime.pushCopySol(current_event.solModifiers);
-            this.forRow = items[i];
-		    current_event.retrigger();
-            if (solModifierAfterCnds)
-		    	this.plugin.runtime.popSol(current_event.solModifiers);
-	   }
-		this.forRow = "";
-	};
-	CSVKlassProto.ForEachColInRow = function (row)
-	{
-        var has_row_index = (this.items.indexOf(row)!=(-1));
-        if (!has_row_index)
-        {
-;
-            return;
-        }
-        this.forRow = row;
-        var current_frame = this.plugin.runtime.getCurrentEventStack();
-        var current_event = current_frame.current_event;
-		var solModifierAfterCnds = current_frame.isModifierAfterCnds();
-		this.forCol = "";
-        var keys = this.keys;
-        var key_cnt = keys.length;
-        var i;
-		for (i=0; i<key_cnt; i++ )
-	    {
-            if (solModifierAfterCnds)
-		        this.plugin.runtime.pushCopySol(current_event.solModifiers);
-		    this.forCol = keys[i];
-		    current_event.retrigger();
-            if (solModifierAfterCnds)
-		    	this.plugin.runtime.popSol(current_event.solModifiers);
-		}
-		this.forCol = "";
-	};
-    CSVKlassProto.GetColCnt = function()
-    {
-        return this.keys.length;
-    };
-    CSVKlassProto.GetRowCnt = function()
-    {
-        return this.items.length;
-    };
-    var _row_sort = function(col0, col1)
-    {
-        var item0 = _sort_table[col0][_sort_row_name];
-        var item1 = _sort_table[col1][_sort_row_name];
-        return (item0 > item1) ? (_sort_is_increasing? 1:-1):
-               (item0 < item1) ? (_sort_is_increasing? -1:1):
-                                 0;
-    };
-    CSVKlassProto.SortCol = function (col, sortMode_)  // 0=a, 1=d, 2=la, 3=ld
-    {
-        var has_col_index = (this.keys.indexOf(col)!=(-1));
-        if (!has_col_index)
-        {
-;
-            return;
-        }
-        var self=this;
-        var sortFn = function (row0, row1)
-        {
-            var sortMode = sortMode_;
-            var v0 =  self.table[col][row0];
-            var v1 =  self.table[col][row1];
-            if (sortMode > 1)  // 2=la, 3=ld
-            {
-                v0 = parseFloat(v0);
-                v1 = parseFloat(v1);
-                sortMode -= 2;
-            }
-            return (v0 > v1) ? (sortMode? -1:1):
-                       (v0 < v1) ? (sortMode? 1:-1):
-                                         0;
-        }
-        this.items.sort(sortFn);
-    };
-    CSVKlassProto.SortRow = function (row, sortMode_)
-    {
-        var has_row_index = (this.items.indexOf(row)!=(-1));
-        if (!has_row_index)
-        {
-;
-            return;
-        }
-        var self=this;
-        var sortFn = function (col0, col1)
-        {
-            var sortMode = sortMode_;
-            var v0 = self.table[col0][row];
-            var v1 = self.table[col1][row];
-            if (sortMode > 1)  // 2=la, 3=ld
-            {
-                v0 = parseFloat(v0);
-                v1 = parseFloat(v1);
-                sortMode -= 2;
-            }
-            return (v0 > v1) ? (sortMode? -1:1):
-                   (v0 < v1) ? (sortMode? 1:-1):
-                                         0;
-        }
-        this.keys.sort(sortFn);
-    };
-    var dump_lines = [];
-    CSVKlassProto.ToCSVString = function ()
-    {
-        var strDelimiter = this.plugin.strDelimiter;
-        var isEvalMode = this.plugin.isEvalMode;
-        var l = "";
-        var k, kcnt = this.keys.length;
-        for (k=0; k<kcnt; k++)
-        {
-            l += (strDelimiter + cell_string_get(this.keys[k], false, strDelimiter));
-        }
-        dump_lines.push(l);
-        var i, icnt = this.items.length;
-        for (i=0; i<icnt; i++)
-        {
-            l = cell_string_get(this.items[i], false, strDelimiter);
-            for (k=0; k<kcnt; k++)
-            {
-                l += (strDelimiter + cell_string_get(this.table[this.keys[k]][this.items[i]], isEvalMode, strDelimiter));
-            }
-            dump_lines.push(l);
-        }
-        var csvString = dump_lines.join("\n");
-        dump_lines.length = 0;
-        return csvString;
-    };
-    var cell_string_get = function (value_, isEvalMode, strDelimiter)
-    {
-        if (typeof(value_) == "number")
-            value_ = value_.toString();
-        else
-        {
-            if (isEvalMode)
-                value_ = '"' + value_ + '"';
-            if (strDelimiter == null)
-                strDelimiter = ",";
-            var need_add_quotes = (value_.indexOf(strDelimiter) != (-1)) ||
-                                  (value_.indexOf("\n") != (-1));
-            if (value_.indexOf('"') != (-1))
-            {
-                var re = new RegExp('"', 'g');
-                value_ = value_.replace(re, '""');
-                need_add_quotes = true;
-            }
-            if ( need_add_quotes)
-            {
-                value_ = '"' + value_ + '"';
-            }
-        }
-        return value_;
-    };
-    var CSVToArray = function ( strData, strDelimiter ){
-        strDelimiter = (strDelimiter || ",");
-        var objPattern = new RegExp(
-                (
-                        "(\\" + strDelimiter + "|\\r?\\n|\\r|^)" +
-                        "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" +
-                        "([^\"\\" + strDelimiter + "\\r\\n]*))"
-                ),
-                "gi"
-                );
-        var arrData = [[]];
-        var arrMatches = null;
-        while (arrMatches = objPattern.exec( strData )){
-                var strMatchedDelimiter = arrMatches[ 1 ];
-                if (
-                        strMatchedDelimiter.length &&
-                        (strMatchedDelimiter != strDelimiter)
-                        ){
-                        arrData.push( [] );
-                }
-                if (arrMatches[ 2 ]){
-                        var strMatchedValue = arrMatches[ 2 ].replace(
-                                new RegExp( "\"\"", "g" ),
-                                "\""
-                                );
-                } else {
-                        var strMatchedValue = arrMatches[ 3 ];
-                }
-                arrData[ arrData.length - 1 ].push( strMatchedValue );
-        }
-        return( arrData );
-    };
 }());
 ;
 ;
@@ -18616,21 +18508,21 @@ cr.behaviors.Anchor = function(runtime)
 }());
 cr.getObjectRefTable = function () { return [
 	cr.plugins_.AJAX,
+	cr.plugins_.Browser,
 	cr.plugins_.rex_bbcodeText,
 	cr.plugins_.TiledBg,
-	cr.plugins_.Rex_CSV,
 	cr.behaviors.Anchor,
 	cr.system_object.prototype.cnds.OnLayoutStart,
 	cr.plugins_.rex_bbcodeText.prototype.acts.SetWebFont,
 	cr.plugins_.rex_bbcodeText.prototype.acts.SetShadow,
 	cr.plugins_.AJAX.prototype.acts.Request,
 	cr.plugins_.AJAX.prototype.cnds.OnAnyComplete,
-	cr.plugins_.Rex_CSV.prototype.acts.LoadCSV,
-	cr.plugins_.AJAX.prototype.exps.LastData,
 	cr.system_object.prototype.cnds.Compare,
 	cr.system_object.prototype.exps.tokenat,
+	cr.plugins_.AJAX.prototype.exps.LastData,
 	cr.plugins_.rex_bbcodeText.prototype.cnds.IsBoolInstanceVarSet,
 	cr.plugins_.rex_bbcodeText.prototype.acts.SetText,
 	cr.plugins_.AJAX.prototype.cnds.OnAnyError,
-	cr.system_object.prototype.cnds.Every
+	cr.system_object.prototype.cnds.Every,
+	cr.plugins_.Browser.prototype.cnds.OnUpdateReady
 ];};

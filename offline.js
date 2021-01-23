@@ -1,5 +1,5 @@
 ﻿{
-	"version": 1611422609,
+	"version": 1611422994,
 	"fileList": [
 		"data.js",
 		"c2runtime.js",
@@ -11,6 +11,9 @@
 		"icon-114.png",
 		"icon-128.png",
 		"icon-256.png",
-		"loading-logo.png"
+		"loading-logo.png",
+		"minecraftia-regular-webfont.woff",
+		"minecraftia-regular-webfont.woff2",
+		"stylesheet.css"
 	]
 }
