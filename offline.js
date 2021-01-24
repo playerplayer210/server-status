@@ -1,19 +1,20 @@
 ﻿{
-	"version": 1611423367,
+	"version": 1611480175,
 	"fileList": [
 		"data.js",
 		"c2runtime.js",
 		"jquery-3.4.1.min.js",
 		"offlineClient.js",
-		"images/tiledbackground.png",
+		"images/background.png",
 		"icon-16.png",
 		"icon-32.png",
 		"icon-114.png",
 		"icon-128.png",
 		"icon-256.png",
 		"loading-logo.png",
-		"minecraftia-regular-webfont.woff",
-		"minecraftia-regular-webfont.woff2",
-		"stylesheet.css"
+		"font.css",
+		"zkjmztoy.eot",
+		"zkjmztoy.ttf",
+		"zkjmztoy.woff"
 	]
 }
