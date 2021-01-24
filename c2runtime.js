@@ -18523,6 +18523,8 @@ cr.getObjectRefTable = function () { return [
 	cr.plugins_.rex_bbcodeText.prototype.cnds.IsBoolInstanceVarSet,
 	cr.plugins_.rex_bbcodeText.prototype.acts.SetText,
 	cr.plugins_.AJAX.prototype.cnds.OnAnyError,
-	cr.system_object.prototype.cnds.Every,
-	cr.plugins_.Browser.prototype.cnds.OnUpdateReady
+	cr.plugins_.Browser.prototype.cnds.OnUpdateReady,
+	cr.system_object.prototype.acts.SetGroupActive,
+	cr.system_object.prototype.cnds.IsGroupActive,
+	cr.system_object.prototype.cnds.Every
 ];};
