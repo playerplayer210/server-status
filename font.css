@@ -1,11 +1,7 @@
 @font-face {
-	font-family: 'ZKjmZtOY';
+	font-family: 'minecraftia';
 	src: url('ZKjmZtOY.eot');
 	src: url('ZKjmZtOY'), url('ZKjmZtOY.woff') format('woff'), url('ZKjmZtOY.ttf') format('truetype');
 }
 /* use this class to attach this font to any element i.e. <p class="fontsforweb_fontid_51508">Text with this font applied</p> */
-.fontsforweb_fontid_51508 {
-	font-family: 'ZKjmZtOY' !important;
-}
-
 /* Font downloaded from FontsForWeb.com */
