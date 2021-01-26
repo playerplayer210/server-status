@@ -18509,8 +18509,8 @@ cr.behaviors.Anchor = function(runtime)
 cr.getObjectRefTable = function () { return [
 	cr.plugins_.AJAX,
 	cr.plugins_.Browser,
-	cr.plugins_.TiledBg,
 	cr.plugins_.rex_bbcodeText,
+	cr.plugins_.TiledBg,
 	cr.behaviors.Anchor,
 	cr.system_object.prototype.cnds.OnLayoutStart,
 	cr.plugins_.rex_bbcodeText.prototype.acts.SetWebFont,
@@ -18530,6 +18530,7 @@ cr.getObjectRefTable = function () { return [
 	cr.plugins_.AJAX.prototype.cnds.OnAnyError,
 	cr.plugins_.Browser.prototype.cnds.OnUpdateReady,
 	cr.system_object.prototype.acts.SetGroupActive,
+	cr.plugins_.Browser.prototype.cnds.OnUpdateFound,
 	cr.system_object.prototype.cnds.IsGroupActive,
 	cr.system_object.prototype.cnds.Every
 ];};
